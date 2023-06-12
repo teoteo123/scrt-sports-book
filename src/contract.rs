@@ -12,9 +12,12 @@ pub fn instantiate(
     _msg: InstantiateMsg,
 ) -> StdResult<Response> {
 
+    // initialize state
     CURRENT_ROUND.save(deps.storage, &Round::default())?;
     ADMIN.save(deps.storage, &info.sender)?;
     DEPOSIT_DENOM.save(deps.storage, &"uscrt".to_string())?;
+    FEE_POOL_BALANCE.save(deps.storage, &Uint128::from(0u128))?;
+    BETTING_OPEN.save(deps.storage, &false)?;
 
     deps.api
         .debug(format!("Contract was initialized by {}", info.sender).as_str());
@@ -34,7 +37,8 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
     }
 }
 
-pub fn place_bet(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Result<Response, ContractError> {
+// makes sure user has balance necessary to bet specified amount and pay a 2% fee then updates their balance accordingly
+fn place_bet(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Result<Response, ContractError> {
     let user_balance = USER_BALANCE
         .add_suffix(info.sender.as_bytes());
     let balance_exists = user_balance.load(deps.storage);
@@ -56,14 +60,16 @@ pub fn place_bet(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Result<Re
     }
 }
 
-pub fn open_round(deps: DepsMut, _info: MessageInfo, id: String, game: String, odds: Uint128) -> Result<Response, ContractError> {
+// opens a new round of betting, updates current round
+fn open_round(deps: DepsMut, _info: MessageInfo, id: String, game: String, odds: Uint128) -> Result<Response, ContractError> {
     // todo: update payouts for previous round bets
     CURRENT_ROUND.save(deps.storage, &Round {id, game, odds})?;
 
     Ok(Response::default())
 }
 
-pub fn close_round(deps: DepsMut, info: MessageInfo, _winner: String) -> Result<Response, ContractError> {
+// closes the current round and sets CURRENT_ROUND to default
+fn close_round(deps: DepsMut, info: MessageInfo, _winner: String) -> Result<Response, ContractError> {
     //check for admin privileges
     let admin = ADMIN.load(deps.storage)?;
     if info.sender != admin {
@@ -71,17 +77,14 @@ pub fn close_round(deps: DepsMut, info: MessageInfo, _winner: String) -> Result<
     }
 
     //re-write round to default
-    let default_round = Round {
-        id: "0".to_string(),
-        game: "N/a".to_string(),
-        odds: Uint128::from(500000u128)
-    };
+    let default_round = Round::default();
 
     CURRENT_ROUND.save(deps.storage, &default_round)?;
     Ok(Response::default())
 }
 
-pub fn deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
+// accepts only uscrt and updates user's balance based on the mount deposited
+fn deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
     let user_balance = USER_BALANCE.add_suffix(info.sender.as_bytes());
     match user_balance.load(deps.storage) {
         Err(_) => {
@@ -95,7 +98,7 @@ pub fn deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractErr
 }
 
 // withdraw specified amount in uscrt from sender's balance
-pub fn withdraw(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Result<Response, ContractError> {
+fn withdraw(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Result<Response, ContractError> {
     let user_balance = USER_BALANCE
         .add_suffix(info.sender.as_bytes());
     let balance_exists = user_balance
@@ -117,7 +120,8 @@ pub fn withdraw(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Result<Res
     }
 }
 
-pub fn withdraw_fees(deps: DepsMut) -> Result<Response, ContractError> {
+// allows only the admin to withdraw all of the money from the fee pool
+fn withdraw_fees(deps: DepsMut) -> Result<Response, ContractError> {
     let fee_balance = FEE_POOL_BALANCE.load(deps.storage)?;
     let message = BankMsg::Send { to_address: ADMIN.load(deps.storage)?.into(), amount: vec![Coin { denom: "uscrt".into(), amount: fee_balance }] };
     Ok(
@@ -138,17 +142,18 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn query_round(deps: Deps) -> StdResult<Binary> {
+// queries
+fn query_round(deps: Deps) -> StdResult<Binary> {
     let result = CURRENT_ROUND.load(deps.storage)?;
     to_binary(&result)
 }
 
-pub fn betting_open(deps: Deps) -> StdResult<Binary> {
+fn betting_open(deps: Deps) -> StdResult<Binary> {
     let betting_open = BETTING_OPEN.load(deps.storage)?;
     to_binary(&betting_open)
 }
 
-pub fn query_balance(deps: Deps, address: Addr) -> StdResult<Binary> {
+fn query_balance(deps: Deps, address: Addr) -> StdResult<Binary> {
     let user_balance = USER_BALANCE
         .add_suffix(address.as_bytes())
         .load(deps.storage)?;

@@ -43,7 +43,7 @@ let upload_contract = async () => {
     console.log(`Contract hash: ${contractCodeHash}`);
 
 };
-// upload_contract();
+upload_contract();
 
 let contractAddress = "secret152ez4w3mmzwr288a2vu47txtpkzvdqcpemh2xc"
 

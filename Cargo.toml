@@ -1,7 +1,7 @@
 [package]
-name = "secret_contract_example"
+name = "scrt_sports_book"
 version = "0.1.0"
-authors = ["SecretTemplateExample"]
+authors = ["Theo Wallace"]
 edition = "2021"
 
 [lib]
@@ -34,7 +34,12 @@ cosmwasm-schema = "1.0.0"
 cw-utils = "1.0.1"
 
 # Uncomment these for some common extra tools
-secret-toolkit = { git = "https://github.com/scrtlabs/secret-toolkit", tag = "v0.8.0" }
+secret-toolkit = { git = "https://github.com/scrtlabs/secret-toolkit", tag = "v0.8.0", features = [
+"utils",
+"storage",
+"serialization",
+"crypto",
+] }
 # cw-storage-plus = { version = "1.0.1", default-features = false }
 
 # [patch.crates-io]
